@@ -1,4 +1,4 @@
-{ lib, stdenv, callPackage, fetchDartDeps, runCommand, writeText, dartHooks, makeWrapper, dart, cacert, nodejs, darwin, jq }:
+{ lib, stdenv, callPackage, fetchDartDeps, runCommand, symlinkJoin, writeText, dartHooks, makeWrapper, dart, cacert, nodejs, darwin, jq }:
 
 { sdkSetupScript ? ""
 , pubGetScript ? "dart pub get"
@@ -36,11 +36,17 @@
 
 let
   dartDeps = (fetchDartDeps.override {
-    dart = runCommand "dart-fod" { nativeBuildInputs = [ makeWrapper ]; } ''
-      mkdir -p "$out/bin"
-      makeWrapper "${dart}/bin/dart" "$out/bin/dart" \
-        --add-flags "--root-certs-file=${cacert}/etc/ssl/certs/ca-bundle.crt"
-    '';
+    dart = symlinkJoin {
+      name = "dart-sdk-fod";
+      paths = [
+        (runCommand "dart-fod" { nativeBuildInputs = [ makeWrapper ]; } ''
+          mkdir -p "$out/bin"
+          makeWrapper "${dart}/bin/dart" "$out/bin/dart" \
+            --add-flags "--root-certs-file=${cacert}/etc/ssl/certs/ca-bundle.crt"
+        '')
+        dart
+      ];
+    };
   }) {
     buildDrvArgs = args;
     inherit sdkSetupScript pubGetScript vendorHash pubspecLockFile;
