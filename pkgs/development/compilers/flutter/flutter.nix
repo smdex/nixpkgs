@@ -23,6 +23,19 @@ let
     inherit pubspecLockFile vendorHash depsListFile;
   };
 
+  devToolsVersion = (builtins.fromJSON (builtins.readFile "${dart}/bin/resources/devtools/version.json")).version;
+  flutterVersion = {
+    inherit devToolsVersion;
+    flutterVersion = "${version}";
+    frameworkVersion = "${version}";
+    channel = "stable";
+    repositoryUrl = "https://github.com/flutter/flutter.git";
+    frameworkRevision = "nixpkgs000000000000000000000000000000000";
+    frameworkCommitDate = "2038-01-19 03:14:08";
+    engineRevision = "${engineVersion}";
+    dartSdkVersion = "${dart.version}";
+  };
+
   unwrapped =
     stdenv.mkDerivation {
       name = "flutter-${version}-unwrapped";
@@ -69,6 +82,7 @@ let
         ln -s '${tools.dartDeps.packageConfig}' packages/flutter_tools/.dart_tool/package_config.json
 
         echo -n "${version}" > version
+        echo -n '${builtins.toJSON flutterVersion}' | tee bin/cache/flutter.version.json
       '';
 
       installPhase = ''
