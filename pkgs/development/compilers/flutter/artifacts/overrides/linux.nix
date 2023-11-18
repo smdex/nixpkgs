@@ -1,4 +1,6 @@
-{ gtk3
+{ gtk3,
+  glib,
+  fontconfig
 }:
 
 { buildInputs ? [ ]
@@ -6,5 +8,5 @@
 }:
 
 {
-  buildInputs = buildInputs ++ [ gtk3 ];
+  buildInputs = buildInputs ++ [ gtk3 glib fontconfig ];
 }
