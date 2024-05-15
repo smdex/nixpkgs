@@ -4,19 +4,25 @@
 , makeWrapper
 , wrapGAppsHook3
 , buildDartApplication
+, darwin
+, cocoapods
+, xcbuild
 , cacert
 , glib
 , flutter
 , pkg-config
 , jq
 , yq
+, moreutils
+, targetPlatform
 }:
 
-# absolutely no mac support for now
-
-{ pubGetScript ? null
+{ pubGetScript ? "flutter pub get"
 , flutterBuildFlags ? [ ]
-, targetFlutterPlatform ? "linux"
+, targetFlutterPlatform ?
+  if targetPlatform.isLinux then "linux"
+  else if targetPlatform.isDarwin then "macos"
+  else "universal"
 , extraWrapProgramArgs ? ""
 , flutterMode ? null
 , ...
@@ -59,7 +65,7 @@ let
 
         export HOME="$NIX_BUILD_TOP"
         flutter config $flutterFlags --no-analytics &>/dev/null # mute first-run
-        flutter config $flutterFlags --enable-linux-desktop >/dev/null
+        flutter config $flutterFlags --enable-${targetFlutterPlatform}-desktop >/dev/null
       '';
 
       pubGetScript = args.pubGetScript or "flutter${lib.optionalString hasEngine " --local-engine $flutterMode"} pub get";
@@ -175,6 +181,49 @@ let
       extraWrapProgramArgs = ''
         ''${gappsWrapperArgs[@]} \
         ${extraWrapProgramArgs}
+      '';
+    };
+
+    macos = universal // {
+      outputs = universal.outputs or [ ] ++ [ "debug" ];
+
+      nativeBuildInputs = (universal.nativeBuildInputs or [ ]) ++ [
+        darwin.DarwinTools
+        cocoapods
+        xcbuild
+      ];
+      buildInputs = (universal.buildInputs or [ ]);
+
+      dontDartBuild = true;
+      buildPhase = universal.buildPhase or ''
+        runHook preBuild
+
+        mkdir -p build/flutter_assets/fonts
+
+        export HOME=$(mktemp -d)
+        flutter build macos -v --release --split-debug-info="$debug" ${builtins.concatStringsSep " " (map (flag: "\"${flag}\"") flutterBuildFlags)}
+
+        runHook postBuild
+      '';
+
+      dontDartInstall = true;
+      installPhase = universal.installPhase or ''
+        runHook preInstall
+
+        built=build/macos/*/release/bundle
+
+        mkdir -p $out/bin
+        mv $built $out/app
+
+        for f in $(find $out/app -iname "*.desktop" -type f); do
+          install -D $f $out/share/applications/$(basename $f)
+        done
+
+        for f in $(find $out/app -maxdepth 1 -type f); do
+          ln -s $f $out/bin/$(basename $f)
+        done
+
+        runHook postInstall
       '';
     };
 
